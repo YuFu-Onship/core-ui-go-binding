@@ -1800,6 +1800,7 @@ struct PageState::JsCondRuntime {
     const ui::uix::Node*  templateNode = nullptr;
     const ui::css::Stylesheet* sheet   = nullptr;
     JSValue               fn           = JS_UNDEFINED;
+    uint64_t              effectId     = 0;
     WidgetPtr             mounted;
     std::vector<uint64_t> innerEffects;
     std::vector<JSValue>  innerFns;
@@ -1807,6 +1808,11 @@ struct PageState::JsCondRuntime {
     // JsLoopRuntime::spec (raw ptr) stays valid for the runtime's lifetime.
     std::vector<CompiledLoop>                  innerLoopSpecs;
     std::vector<std::unique_ptr<JsLoopRuntime>> innerLoops;
+    // Nested v-if owned by this branch. They live only while the parent
+    // branch is mounted; unmounting the parent tears them down instead of
+    // leaving another watcher behind for every remount.
+    std::vector<CompiledConditional>                 innerCondSpecs;
+    std::vector<std::unique_ptr<JsCondRuntime>>      innerConds;
 };
 
 // Per-iteration binding bookkeeping. We need (fn, target, property) together
@@ -1901,6 +1907,11 @@ void PageState::DetachQuickJS() {
     jsEffectIds_.clear();
     JSContext* ctx = jsRt_->ctx();
     for (auto& cr : jsCondRuntimes_) {
+        if (!cr) continue;
+        for (auto& child : cr->innerConds)
+            if (child) TearDownJsConditional(*child);
+        cr->innerConds.clear();
+        cr->innerCondSpecs.clear();
         for (uint64_t id : cr->innerEffects) jsRt_->DisposeEffect(id);
         for (auto& f  : cr->innerFns)        JS_FreeValue(ctx, f);
         for (auto& lr : cr->innerLoops)      if (lr) TearDownJsLoopRuntime(*lr);
@@ -2146,11 +2157,13 @@ void PageState::WireQuickJSConditionals() {
     // themselves. We must NOT double-wire those late-added entries here.
     size_t initial = page_.conditionals.size();
     for (size_t i = 0; i < initial; ++i) {
-        WireConditional(page_.conditionals[i]);
+        if (auto rt = WireConditional(page_.conditionals[i]))
+            jsCondRuntimes_.push_back(std::move(rt));
     }
 }
 
-void PageState::WireConditional(const CompiledConditional& c) {
+std::unique_ptr<PageState::JsCondRuntime>
+PageState::WireConditional(const CompiledConditional& c) {
     JSContext* ctx = jsRt_->ctx();
     {
         auto rt = std::make_unique<JsCondRuntime>();
@@ -2164,11 +2177,11 @@ void PageState::WireConditional(const CompiledConditional& c) {
         if (JS_IsException(rt->fn)) {
             errors_.push_back("v-if compile error: " + jsRt_->lastError() +
                               "\n  source: " + c.condSourceJs);
-            return;
+            rt->fn = JS_UNDEFINED;
+            return nullptr;
         }
 
         JsCondRuntime* rtRaw = rt.get();
-        jsCondRuntimes_.push_back(std::move(rt));
 
         uint64_t effectId = jsRt_->WatchEffect([this, ctx, rtRaw]() {
             JSValue r = JS_Call(ctx, rtRaw->fn, jsState_, 0, nullptr);
@@ -2238,8 +2251,9 @@ void PageState::WireConditional(const CompiledConditional& c) {
                 // one. WireQuickJSConditionals' main loop snapshots size() at
                 // entry, so these late-added entries won't be re-processed.
                 for (auto& sc : sub.conditionals) {
-                    page_.conditionals.push_back(std::move(sc));
-                    WireConditional(page_.conditionals.back());
+                    rtRaw->innerCondSpecs.push_back(std::move(sc));
+                    if (auto child = WireConditional(rtRaw->innerCondSpecs.back()))
+                        rtRaw->innerConds.push_back(std::move(child));
                 }
                 // The compile-time cascade for the freshly-mounted subtree
                 // sees only the static parent chain captured when the SFC
@@ -2264,6 +2278,13 @@ void PageState::WireConditional(const CompiledConditional& c) {
                 // Fire unmount hooks before tearing the subtree down so
                 // user code can read final widget state.
                 if (rtRaw->mounted) DispatchUnmountHooks(rtRaw->mounted.get());
+                // Nested v-if watchers belong to this branch and must die
+                // with it; otherwise every remount leaves another set of
+                // effects pointing at freed widgets.
+                for (auto& child : rtRaw->innerConds)
+                    if (child) TearDownJsConditional(*child);
+                rtRaw->innerConds.clear();
+                rtRaw->innerCondSpecs.clear();
                 for (auto& lr : rtRaw->innerLoops) if (lr) TearDownJsLoopRuntime(*lr);
                 rtRaw->innerLoops.clear();
                 rtRaw->innerLoopSpecs.clear();
@@ -2277,7 +2298,44 @@ void PageState::WireConditional(const CompiledConditional& c) {
                 rtRaw->mounted.reset();
             }
         });
-        jsEffectIds_.push_back(effectId);
+        rtRaw->effectId = effectId;
+        return rt;
+    }
+}
+
+// Tear down a conditional branch and every nested conditional it owns.
+// Unmount hooks are dispatched by the caller for the branch root; this helper
+// only releases watchers / JS values / nested widgets.
+void PageState::TearDownJsConditional(JsCondRuntime& rt) {
+    if (!jsRt_) return;
+    JSContext* ctx = jsRt_->ctx();
+
+    for (auto& child : rt.innerConds)
+        if (child) TearDownJsConditional(*child);
+    rt.innerConds.clear();
+    rt.innerCondSpecs.clear();
+
+    for (auto& lr : rt.innerLoops)
+        if (lr) TearDownJsLoopRuntime(*lr);
+    rt.innerLoops.clear();
+    rt.innerLoopSpecs.clear();
+
+    for (uint64_t id : rt.innerEffects) jsRt_->DisposeEffect(id);
+    rt.innerEffects.clear();
+    for (auto& f : rt.innerFns) JS_FreeValue(ctx, f);
+    rt.innerFns.clear();
+
+    if (rt.mounted) {
+        if (rt.parent) rt.parent->RemoveChild(rt.mounted.get());
+        rt.mounted.reset();
+    }
+    if (rt.effectId) {
+        jsRt_->DisposeEffect(rt.effectId);
+        rt.effectId = 0;
+    }
+    if (!JS_IsUndefined(rt.fn)) {
+        JS_FreeValue(ctx, rt.fn);
+        rt.fn = JS_UNDEFINED;
     }
 }
 

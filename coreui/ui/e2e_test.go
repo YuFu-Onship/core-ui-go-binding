@@ -607,3 +607,114 @@ func TestEventBusDispatchesToGo(t *testing.T) {
 		t.Fatalf("重复事件不应该再次触发: clicks=%d", clicks)
 	}
 }
+
+// Regression: nested v-if runtimes used to be appended to the page-global
+// conditional list on every remount. Toggling an outer v-if repeatedly left
+// duplicate watchers behind, which eventually kept stale cards mounted and
+// crashed when a later toggle wrote into freed widgets.
+func TestNestedVIfRemountDoesNotLeakBranches(t *testing.T) {
+	e2e(t)
+	if err := coreui.InitWithTheme(coreui.Light); err != nil {
+		t.Fatalf("init: %v", err)
+	}
+	defer coreui.Shutdown()
+
+	app := NewApp(Options{Title: "nested-vif", Width: 420, Height: 320, Theme: coreui.Light})
+	outer := app.Bool(true)
+	inner := app.Bool(true)
+	app.View(func() *Node {
+		return Column(
+			When(outer, Column(
+				Text("outer").ID("outerBranch"),
+				When(inner, Text("inner").ID("innerBranch")),
+				Unless(inner, Text("inner-else").ID("innerElse")),
+			).Gap(6)),
+		).Padding(12)
+	})
+	if err := app.start(); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	defer app.shutdown()
+
+	root := app.Page().Root()
+	for i := 0; i < 80; i++ {
+		inner.Set(false)
+		coreui.DebugPump()
+		if root.FindByID("innerBranch").Handle() != 0 {
+			t.Fatalf("iteration %d: inner branch stayed mounted", i)
+		}
+		if root.FindByID("innerElse").Handle() == 0 {
+			t.Fatalf("iteration %d: inner else did not mount", i)
+		}
+
+		inner.Set(true)
+		coreui.DebugPump()
+		if root.FindByID("innerBranch").Handle() == 0 {
+			t.Fatalf("iteration %d: inner branch did not remount", i)
+		}
+
+		outer.Set(false)
+		coreui.DebugPump()
+		if root.FindByID("outerBranch").Handle() != 0 {
+			t.Fatalf("iteration %d: outer branch stayed mounted", i)
+		}
+
+		outer.Set(true)
+		coreui.DebugPump()
+		if root.FindByID("outerBranch").Handle() == 0 {
+			t.Fatalf("iteration %d: outer branch did not remount", i)
+		}
+	}
+}
+
+// Regression: an open ComboBox must not leave the page in a state where a
+// normal button click crashes. This mirrors clicking a card button while the
+// dropdown overlay is open.
+func TestSelectOpenThenClickButton(t *testing.T) {
+	e2e(t)
+	if err := coreui.InitWithTheme(coreui.Light); err != nil {
+		t.Fatalf("init: %v", err)
+	}
+	defer coreui.Shutdown()
+
+	app := NewApp(Options{Title: "select-button", Width: 460, Height: 340, Theme: coreui.Light})
+	choice := app.Int(0)
+	app.View(func() *Node {
+		return Column(
+			Row(
+				Select(choice, []string{"A", "B", "C", "D"}).ID("sel").Width(220),
+				Button("apply").ID("apply").OnClick(func() { choice.Set(2) }),
+			).Gap(120),
+			WhenInt(choice, 0, Text("card A").ID("cardA")),
+			WhenInt(choice, 2, Text("card C").ID("cardC")),
+		).Padding(12).Gap(10)
+	})
+	if err := app.start(); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	defer app.shutdown()
+
+	win := app.Window()
+	root := app.Page().Root()
+	sel := root.FindByID("sel")
+	apply := root.FindByID("apply")
+	if sel.Handle() == 0 || apply.Handle() == 0 {
+		t.Fatal("widgets not found")
+	}
+	for i := 0; i < 30; i++ {
+		if !win.DebugClick(sel) {
+			t.Fatalf("iteration %d: open failed", i)
+		}
+		coreui.DebugPump()
+		if !win.DebugClick(apply) {
+			t.Fatalf("iteration %d: apply click failed", i)
+		}
+		coreui.DebugPump()
+		if got := choice.Get(); got != 2 {
+			t.Fatalf("iteration %d: choice=%d", i, got)
+		}
+		if root.FindByID("cardC").Handle() == 0 {
+			t.Fatalf("iteration %d: card C missing", i)
+		}
+	}
+}

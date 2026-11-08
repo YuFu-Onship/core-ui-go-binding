@@ -1597,10 +1597,14 @@ D2D1_RECT_F TextAreaWidget::ThumbRect() const {
     float trackBot = rect.bottom - 4;
     float trackH = trackBot - trackTop;
 
-    float thumbH = std::max(20.0f, trackH * (visH / contH));
+    float thumbH = std::min(trackH, std::max(20.0f, trackH * (visH / contH)));
     float maxScroll = contH - visH;
-    float ratio = (maxScroll > 0) ? (scrollY_ / maxScroll) : 0;
+    // scrollY_ may be stale between a text edit and the next layout pass.
+    // Clamp here as well so the thumb can never be drawn outside the track.
+    float clampedScroll = std::clamp(scrollY_, 0.0f, maxScroll);
+    float ratio = (maxScroll > 0) ? (clampedScroll / maxScroll) : 0;
     float thumbTop = trackTop + ratio * (trackH - thumbH);
+    thumbTop = std::clamp(thumbTop, trackTop, trackBot - thumbH);
 
     return {rect.right - kScrollBarWidth - 2, thumbTop,
             rect.right - 2, thumbTop + thumbH};
@@ -1614,6 +1618,9 @@ void TextAreaWidget::SetText(const std::wstring& t) {
     text_ = t;
     cursorPos_ = (int)t.size();
     selectionStart_ = selectionEnd_ = -1;
+    // External writes (v-model / SetText) replace the whole document; the
+    // old scroll offset belongs to a different content height.
+    scrollY_ = 0;
     layoutDirty_ = true;
     undo_.Clear();
     ResetCaretBlink();
@@ -1772,6 +1779,9 @@ void TextAreaWidget::EnsureCursorVisible(MeasureContext* measure) {
     if (contentY < scrollY_) scrollY_ = contentY;
     else if (contentY + ch > scrollY_ + viewH) scrollY_ = contentY + ch - viewH;
     if (scrollY_ < 0) scrollY_ = 0;
+    // Deleting text shrinks ContentHeight(); without this the old offset
+    // survives and the thumb is painted below the text area.
+    ClampScroll();
 }
 
 std::wstring TextAreaWidget::GetSelectedText() const {

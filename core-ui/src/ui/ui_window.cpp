@@ -3416,6 +3416,7 @@ void UiWindowImpl::OnMouseDown(float x, float y) {
         bool handledByDropdown = false;
         int selectedDropdownIndex = -1;
         std::function<void(int)> selectionChanged;
+        WidgetPtr dropdownKeepAlive;
         ForEachWidget(root_.get(), [&](Widget* w) {
             if (handledByDropdown) return;
             auto* cb = dynamic_cast<ComboBoxWidget*>(w);
@@ -3434,6 +3435,10 @@ void UiWindowImpl::OnMouseDown(float x, float y) {
                  * widget pointers it is holding) dangling — clicking a later
                  * Select option and then an earlier one crashed here. */
                 selectionChanged = cb->onSelectionChanged;
+                // The page callback can unmount the Select's container. Hold
+                // the ComboBox through the deferred callback so the raw
+                // pointer captured by PageState stays valid.
+                dropdownKeepAlive = cb->shared_from_this();
                 selectedDropdownIndex = dropdownIndex;
                 cb->Close();
                 handledByDropdown = true;
@@ -3449,6 +3454,7 @@ void UiWindowImpl::OnMouseDown(float x, float y) {
             UpdateCaretBlinkTimer();
             InvalidateNow();
             if (selectionChanged) selectionChanged(selectedDropdownIndex);
+            (void)dropdownKeepAlive;
             return;
         }
     }

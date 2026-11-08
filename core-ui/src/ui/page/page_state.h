@@ -143,13 +143,19 @@ private:
     void ReapplyKeyTexts();
 
     // ---- QuickJS path state ----
+    struct JsCondRuntime;
     void AttachQuickJS(CompiledPage page);
     void DetachQuickJS();
     void WireQuickJSConditionals();
     // Helper extracted from WireQuickJSConditionals so nested v-if (a v-if
     // declared inside another v-if's subtree, surfaced as sub.conditionals)
     // can wire its own runtime without copy-pasting the watcher body.
-    void WireConditional(const CompiledConditional& c);
+    // Ownership stays with the caller: top-level conditionals go into
+    // jsCondRuntimes_, nested ones into the parent JsCondRuntime. This is
+    // what lets an unmount tear down only that branch's watchers instead of
+    // accumulating them for every remount.
+    std::unique_ptr<JsCondRuntime> WireConditional(const CompiledConditional& c);
+    void TearDownJsConditional(JsCondRuntime& rt);
     void WireQuickJSLoops();
     void WireQuickJSModelWrite(Widget* target, const std::string& propName);
     void WireQuickJSEvent(Widget* target, const std::string& evName,

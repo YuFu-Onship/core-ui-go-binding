@@ -98,7 +98,18 @@ bitblt 让 DWM 看到普通重定向表面，窗口背景更稳定。
 
 - **Select / ComboBox 崩溃修复**：`onSelectionChanged` 过去在 `ForEachWidget`
   遍历中同步执行，回调里触发 `Rebuild` 会在遍历中挂载/卸载 `WhenInt` 分支，
-  导致崩溃。现在回调延迟到遍历结束后执行；关闭下拉时同步重置 `hoveredIndex_`。
+  导致崩溃。现在回调延迟到遍历结束后执行；关闭下拉时同步重置 `hoveredIndex_`，
+  并且在下拉选择回调期间持有 ComboBox 的 `shared_ptr`，防止回调卸载页面后
+  访问已释放控件。
+- **嵌套 v-if 生命周期**：`When` / `WhenInt` / `Unless` 动态挂载出的子条件
+  以前会被追加到页面全局条件列表，卸载时只移除当前子树，子条件 watcher
+  仍然保留。反复进出“条件与 Rebuild”页面会积累重复 watcher，表现为越用越卡、
+  内存上涨，切换开关时访问已释放控件而崩溃。现在嵌套条件由父条件持有，
+  父分支卸载时递归销毁其 watcher、JS 值和已挂载子树。
+- **多行输入框滚动条**：文本变短后 `scrollY` 可能大于新的最大滚动值，
+  导致 thumb 高度变化但 Y 不回收、甚至画出文本框。现在文本编辑 / 外部
+  `SetText` 后会重新夹紧 `scrollY`，`ThumbRect()` 也会把比例和位置夹在
+  轨道范围内。
 - **ScrollView 滚动条**：绘制顺序改为“背景 → 裁剪后的 content → 滚动条 thumb”，
   滚动条放在右侧专用 gutter（需要滚动时预留 12px），不会压住卡片和按钮；
   thumb 为中性灰，hover/drag 时只变亮，不再使用 accent 蓝。
