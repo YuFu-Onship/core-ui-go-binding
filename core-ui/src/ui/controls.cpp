@@ -573,8 +573,11 @@ void CheckBoxWidget::OnDraw(Renderer& r) {
 
         if (t > 0.3f) {
             float glyphAlpha = std::min(1.0f, (t - 0.3f) / 0.4f);
-            D2D1_COLOR_F checkColor = dark ? D2D1_COLOR_F{0,0,0, glyphAlpha}
-                                           : D2D1_COLOR_F{1,1,1, glyphAlpha};
+            /* The checked background is the accent fill in both themes, so the
+             * check glyph must stay white. Using black in dark mode made the
+             * checked checkbox look like an empty dark square. */
+            D2D1_COLOR_F checkColor = theme::white;
+            checkColor.a = glyphAlpha;
             float glyphSize = 12.0f;
             D2D1_RECT_F glyphBox = {
                 bx + (boxSize - glyphSize) / 2, by + (boxSize - glyphSize) / 2,
