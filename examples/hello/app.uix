@@ -1,0 +1,83 @@
+<window title="Core UI + Go" width="620" height="520"
+        min-width="480" min-height="360"
+        resizable="true" centered="true" theme="light"/>
+
+<script>
+export default {
+  data() {
+    return {
+      count: 0,
+      name: "World",
+      nativeHits: 0,
+      nativeMsg: "(等待 Go 写入)",
+      items: [
+        { id: 1, label: "alpha", done: false },
+        { id: 2, label: "beta", done: true },
+        { id: 3, label: "gamma", done: false }
+      ]
+    };
+  },
+  computed: {
+    greeting() { return "Hello, " + this.name + "!"; }
+  },
+  methods: {
+    inc() { this.count++; },
+    reset() { this.count = 0; },
+    addItem() {
+      var next = this.items.slice();
+      next.push({ id: Date.now(), label: "item-" + next.length, done: false });
+      this.items = next;
+    },
+    toggle(item) {
+      var id = item.id;
+      this.items = this.items.map(function (x) {
+        if (x.id !== id) return x;
+        return { id: x.id, label: x.label, done: !x.done };
+      });
+    }
+  }
+}
+</script>
+
+<style>
+  .root { padding: 22px; gap: 14px; background: #f6f7f9; }
+  .h1 { font-size: 20px; font-weight: 600; color: #1f2937; }
+  .row { flex-direction: row; gap: 10px; align-items: center; }
+  .muted { color: #6b7280; font-size: 12px; }
+  button { background: #2563eb; color: #ffffff; padding: 6px 14px; border-radius: 6px; cursor: pointer; }
+  button:hover { background: #1d4ed8; }
+  input { padding: 6px 10px; border-radius: 6px; border: 1px solid #d1d5db; }
+</style>
+
+<template>
+  <div class="root">
+    <label class="h1">Core UI + Go</label>
+    <label class="muted">界面写在 app.uix 里，编译和逻辑在 Go 里。</label>
+
+    <div class="row">
+      <label>count = {{ count }}</label>
+      <button @click="inc">+1</button>
+      <button @click="reset">reset</button>
+    </div>
+
+    <div class="row">
+      <input v-model="name" placeholder="your name"/>
+      <label>{{ greeting }}</label>
+    </div>
+
+    <label class="muted">Go 写入的变量 nativeMsg：{{ nativeMsg }}</label>
+
+    <div class="row">
+      <button id="btnNative">Go 原生回调</button>
+      <label class="muted">点击次数 = {{ nativeHits }}</label>
+    </div>
+
+    <div class="row">
+      <button @click="addItem">加一条</button>
+    </div>
+    <div v-for="(item, i) in items" :key="item.id" class="row">
+      <label class="muted">{{ i }}. {{ item.label }}</label>
+      <button @click="toggle(item)">{{ item.done ? "已完成" : "未完成" }}</button>
+    </div>
+  </div>
+</template>
