@@ -79,6 +79,7 @@ type state interface {
 
 // NewApp 创建应用；用 View 注册视图，用 Run 启动消息循环。
 func NewApp(opts Options) *App {
+	applyPalette(opts.Theme != coreui.Light, opts.Accent)
 	return &App{
 		opts:     opts,
 		handlers: map[int]handlerSpec{},
@@ -217,6 +218,9 @@ func (a *App) Rebuild() {
 func (a *App) SetTheme(t coreui.Theme) {
 	a.opts.Theme = t
 	coreui.SetTheme(t)
+	applyPalette(t != coreui.Light, a.opts.Accent)
+	// 纯 Go token 是具体的 color.RGBA，切换主题后需要重建一次视图。
+	a.Rebuild()
 }
 
 // SetLocale 切换页面语言（配合 Page.LoadLanguageString / File 使用）。
@@ -271,6 +275,7 @@ func (a *App) start() error {
 
 // render 构建源码、加载页面并绑定状态/事件。
 func (a *App) render() (*coreui.Page, error) {
+	applyPalette(a.opts.Theme != coreui.Light, a.opts.Accent)
 	node, err := a.invokeView()
 	if err != nil {
 		return nil, err

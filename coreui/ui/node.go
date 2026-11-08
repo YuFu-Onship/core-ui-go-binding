@@ -28,6 +28,7 @@ package ui
 import (
 	"encoding/json"
 	"fmt"
+	"image/color"
 	"strings"
 )
 
@@ -510,12 +511,11 @@ func (n *Node) CenterContent() *Node {
 
 // ---- 视觉 --------------------------------------------------------------
 
-// Bg 设置背景色。可以是主题 token（如 ui.Bg2）、CSS 字符串或
-// color.Color（color.RGBA / color.NRGBA 等）。
-func (n *Node) Bg(color any) *Node { return n.Style("background: " + cssColor(color)) }
+// Bg 设置背景色。固定使用 color.RGBA；也可以直接传主题 token（如 ui.Bg2）。
+func (n *Node) Bg(c color.RGBA) *Node { return n.Style("background: " + cssColor(c)) }
 
-// Color 设置文字颜色。可以是主题 token（如 ui.Fg3）、CSS 字符串或 color.Color。
-func (n *Node) Color(color any) *Node { return n.Style("color: " + cssColor(color)) }
+// Color 设置文字颜色。固定使用 color.RGBA；也可以直接传主题 token（如 ui.Fg3）。
+func (n *Node) Color(c color.RGBA) *Node { return n.Style("color: " + cssColor(c)) }
 
 // FontSize 设置字号。
 func (n *Node) FontSize(v float64) *Node { return n.Style("font-size: " + px(v)) }
@@ -530,28 +530,28 @@ func (n *Node) Radius(v float64) *Node { return n.Style("border-radius: " + px(v
 func (n *Node) Opacity(v float64) *Node { return n.Style("opacity: " + num(v)) }
 
 // Border 设置边框。color 可以是主题 token、CSS 字符串或 color.Color。
-func (n *Node) Border(width float64, color any) *Node {
-	return n.Style(fmt.Sprintf("border: %s solid %s", px(width), cssColor(color)))
+func (n *Node) Border(width float64, c color.RGBA) *Node {
+	return n.Style(fmt.Sprintf("border: %s solid %s", px(width), cssColor(c)))
 }
 
 // BorderTop 设置上边框。
-func (n *Node) BorderTop(width float64, color any) *Node {
-	return n.Style(fmt.Sprintf("border-top: %s solid %s", px(width), cssColor(color)))
+func (n *Node) BorderTop(width float64, c color.RGBA) *Node {
+	return n.Style(fmt.Sprintf("border-top: %s solid %s", px(width), cssColor(c)))
 }
 
 // BorderRight 设置右边框。
-func (n *Node) BorderRight(width float64, color any) *Node {
-	return n.Style(fmt.Sprintf("border-right: %s solid %s", px(width), cssColor(color)))
+func (n *Node) BorderRight(width float64, c color.RGBA) *Node {
+	return n.Style(fmt.Sprintf("border-right: %s solid %s", px(width), cssColor(c)))
 }
 
 // BorderBottom 设置下边框。
-func (n *Node) BorderBottom(width float64, color any) *Node {
-	return n.Style(fmt.Sprintf("border-bottom: %s solid %s", px(width), cssColor(color)))
+func (n *Node) BorderBottom(width float64, c color.RGBA) *Node {
+	return n.Style(fmt.Sprintf("border-bottom: %s solid %s", px(width), cssColor(c)))
 }
 
 // BorderLeft 设置左边框。
-func (n *Node) BorderLeft(width float64, color any) *Node {
-	return n.Style(fmt.Sprintf("border-left: %s solid %s", px(width), cssColor(color)))
+func (n *Node) BorderLeft(width float64, c color.RGBA) *Node {
+	return n.Style(fmt.Sprintf("border-left: %s solid %s", px(width), cssColor(c)))
 }
 
 // Shadow 设置阴影。

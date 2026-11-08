@@ -1438,6 +1438,12 @@ void UiWindowImpl::SetRoot(WidgetPtr root) {
         hoveredWidget_ = nullptr;
         pressedWidget_ = nullptr;
         tooltipWidget_ = nullptr;
+        tooltipVisible_ = false;
+        if (tooltipTimerId_) {
+            KillTimer(hwnd_, tooltipTimerId_);
+            tooltipTimerId_ = 0;
+        }
+        StopDragAutoScroll();
         dragOverTarget_ = nullptr;
         if (dragSource_) {
             dragSource_ = nullptr;
@@ -3279,6 +3285,18 @@ void UiWindowImpl::OnMouseMove(float x, float y) {
             std::unordered_set<Widget*> oldChain, newChain;
             for (Widget* w = hoveredWidget_; w; w = w->Parent()) oldChain.insert(w);
             for (Widget* w = hit; w; w = w->Parent()) newChain.insert(w);
+
+            /* @mouseenter / @mouseleave handlers are arbitrary user code and
+             * can rebuild the page (v-if / v-for). Keep every widget in both
+             * chains alive until we finish the whole hover transition: the
+             * raw pointers below are only borrowed views into those chains. */
+            std::vector<WidgetPtr> chainKeepAlive;
+            chainKeepAlive.reserve(oldChain.size() + newChain.size() + 1);
+            for (Widget* w : oldChain) chainKeepAlive.push_back(w->shared_from_this());
+            for (Widget* w : newChain) {
+                if (!oldChain.count(w)) chainKeepAlive.push_back(w->shared_from_this());
+            }
+
             for (Widget* w : oldChain) {
                 if (newChain.count(w)) continue;
                 w->hovered = false;
@@ -3505,6 +3523,11 @@ void UiWindowImpl::OnMouseDown(float x, float y) {
     }
 
     if (hit) {
+        // User @mousedown hooks can rebuild the page and detach `hit` from
+        // its tree. Hold a strong reference until both hooks return.
+        WidgetPtr hitKeepAlive = hit->shared_from_this();
+        (void)hitKeepAlive;
+
         hit->pressed = true;
         hit->RefreshCssState();
         pressedWidget_ = hit;
@@ -3596,9 +3619,12 @@ void UiWindowImpl::OnMouseDoubleClick(float x, float y) {
         }
     }
     // Walk up to the first widget that consumes the dblclick, mirroring
-    // how onClick bubbles through wrapper layouts.
-    for (Widget* w = hit; w; w = w->Parent()) {
-        if (w->OnMouseDoubleClick(e)) break;
+    // how onClick bubbles through wrapper layouts. Snapshot the chain as
+    // shared_ptr: a @dblclick handler can rebuild the page mid-walk.
+    std::vector<WidgetPtr> dblChain;
+    for (Widget* w = hit; w; w = w->Parent()) dblChain.push_back(w->shared_from_this());
+    for (auto& wp : dblChain) {
+        if (wp->OnMouseDoubleClick(e)) break;
     }
     InvalidateNow();
 }
@@ -3657,7 +3683,13 @@ void UiWindowImpl::OnMouseUp(float x, float y) {
         if (hitWidget && !wasDrag) {
             Widget* target = w;
             while (target && !target->onClick) target = target->Parent();
-            if (target && target->onClick) target->onClick();
+            if (target && target->onClick) {
+                // The handler may rebuild the page and free the target's
+                // ancestor chain; keep the target itself alive through it.
+                WidgetPtr targetKeepAlive = target->shared_from_this();
+                (void)targetKeepAlive;
+                target->onClick();
+            }
         }
 
         if (dynamic_cast<SliderWidget*>(w) ||

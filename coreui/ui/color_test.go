@@ -4,14 +4,21 @@ import (
 	"image/color"
 	"strings"
 	"testing"
+
+	"github.com/YuFu-Onship/core-ui-go-binding/coreui"
 )
 
 func TestColorTokens(t *testing.T) {
-	if Fg1 != "var(--fg)" || Fg4 != "var(--fg-4)" {
-		t.Fatalf("Fg token 不对: %q %q", Fg1, Fg4)
+	applyPalette(false, "")
+	if Fg1 != RGB(0x24, 0x24, 0x24) || Fg4 != RGB(0x70, 0x70, 0x70) {
+		t.Fatalf("Fg token mismatch: %v %v", Fg1, Fg4)
 	}
-	if CardBg != "var(--card-bg)" || BorderSubtle != "var(--border-subtle)" {
-		t.Fatalf("背景/边框 token 不对: %q %q", CardBg, BorderSubtle)
+	if CardBg != RGB(0xff, 0xff, 0xff) || BorderSubtle != RGB(0xe0, 0xe0, 0xe0) {
+		t.Fatalf("surface token mismatch: %v %v", CardBg, BorderSubtle)
+	}
+	applyPalette(true, "")
+	if Fg1 != White || Fg3 != RGB(0xad, 0xad, 0xad) {
+		t.Fatalf("dark Fg token mismatch: %v %v", Fg1, Fg3)
 	}
 }
 
@@ -31,20 +38,14 @@ func TestColorFromStandardLibrary(t *testing.T) {
 			t.Errorf("%s: FromColor=%q want %q", tc.name, got, tc.want)
 		}
 	}
-	if got := RGB(0x25, 0x63, 0xeb); got != "#2563eb" {
-		t.Errorf("RGB=%q", got)
-	}
-	if got := RGBA(0x25, 0x63, 0xeb, 0x80); got != "#2563eb80" {
-		t.Errorf("RGBA=%q", got)
-	}
 }
 
-func TestColorModifiersAcceptAnyColor(t *testing.T) {
-	app := NewApp(Options{})
+func TestColorModifiersRequireRGBA(t *testing.T) {
+	app := NewApp(Options{Theme: coreui.Light})
 	app.View(func() *Node {
 		return Column(
 			Text("a").Color(Fg3),
-			Text("b").Color(color.NRGBA{R: 0xff, G: 0x00, B: 0x00, A: 0xff}),
+			Text("b").Color(color.RGBA{R: 0xff, G: 0x00, B: 0x00, A: 0xff}),
 			Text("c").Bg(CardBg),
 		)
 	})
@@ -53,12 +54,12 @@ func TestColorModifiersAcceptAnyColor(t *testing.T) {
 		t.Fatalf("Source: %v", err)
 	}
 	for _, want := range []string{
-		`color: var(--fg-3)`,
+		`color: #616161`,
 		`color: #ff0000`,
-		`background: var(--card-bg)`,
+		`background: #ffffff`,
 	} {
 		if !strings.Contains(src, want) {
-			t.Errorf("源码缺少 %q:\n%s", want, src)
+			t.Errorf("generated source missing %q:\n%s", want, src)
 		}
 	}
 }

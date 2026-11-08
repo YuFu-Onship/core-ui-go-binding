@@ -44,6 +44,9 @@ AI 只在上游代码基础上做了本仓库列出的补丁。
   不需要 `.uix`，也不需要手写 JavaScript；运行时自动生成 core-ui 页面。
 - 构建脚本：`scripts/build-core-ui.ps1` 构建 DLL 并刷新 cgo 依赖；
   `scripts/build-app.ps1` 构建 Go 应用并自动复制 DLL，默认使用 Windows GUI 子系统。
+- 版本管理：`coreui.DLLVersion()` 读取运行时 DLL 的
+  `major.minor.patch.build`，配合 `VersionInfo.AtLeast()` 可在启动时检查
+  DLL 是否满足当前绑定要求。
 
 ### 2.2 窗口合成模式（重点）
 
@@ -116,6 +119,10 @@ bitblt 让 DWM 看到普通重定向表面，窗口背景更稳定。
   可用 `coreui.DebugHandleCount()` 检查操作前后的存活句柄数。
 - **文本控件 / 列表交互**：增加 Enter 提交（`OnSubmit`）、文本双绑、列表
   `Each` + `Rebuild` 等纯 Go 用法；`examples/gallery` 覆盖这些场景。
+- **颜色 API 收紧**：`Color` / `Bg` / `Border*` 只接受 `color.RGBA`；
+  `ui.Fg1`、`ui.Bg2`、`ui.Accent` 等主题 token 也改为 `color.RGBA`，
+  不再接受字符串或任意 `any`。`App.SetTheme` 会刷新纯 Go 颜色 token
+  并自动触发一次 Rebuild。
 
 ### 2.5 受影响的 C++ 文件
 

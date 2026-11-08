@@ -44,6 +44,54 @@ const (
 	Light Theme = 1
 )
 
+// VersionInfo 是当前加载的 core-ui.dll 的版本信息。
+type VersionInfo struct {
+	Major int
+	Minor int
+	Patch int
+	Build int
+}
+
+// String 返回 "major.minor.patch.build"。
+func (v VersionInfo) String() string {
+	return fmt.Sprintf("%d.%d.%d.%d", v.Major, v.Minor, v.Patch, v.Build)
+}
+
+// Compare 比较两个版本，返回 -1 / 0 / 1。
+func (v VersionInfo) Compare(other VersionInfo) int {
+	a := [4]int{v.Major, v.Minor, v.Patch, v.Build}
+	b := [4]int{other.Major, other.Minor, other.Patch, other.Build}
+	for i := range a {
+		switch {
+		case a[i] < b[i]:
+			return -1
+		case a[i] > b[i]:
+			return 1
+		}
+	}
+	return 0
+}
+
+// AtLeast 判断当前 DLL 版本是否不低于 want，适合启动时做 ABI 兼容检查。
+func (v VersionInfo) AtLeast(want VersionInfo) bool {
+	return v.Compare(want) >= 0
+}
+
+// DLLVersion 返回当前实际加载的 core-ui.dll 版本。
+//
+// 它读取的是运行时 DLL 导出的版本号，而不是 Go 模块或头文件版本，可用于
+// 打包时检查用户机器上的 DLL 是否满足要求。
+func DLLVersion() VersionInfo {
+	var major, minor, patch C.int
+	C.ui_core_version(&major, &minor, &patch)
+	return VersionInfo{
+		Major: int(major),
+		Minor: int(minor),
+		Patch: int(patch),
+		Build: int(C.ui_core_version_build()),
+	}
+}
+
 // Version 返回 core-ui 运行时的版本串，例如 "1.9.0.345"。
 func Version() string {
 	return C.GoString(C.ui_core_version_string())

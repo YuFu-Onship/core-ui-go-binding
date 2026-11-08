@@ -41,6 +41,42 @@
 - Go 1.24+
 - 已编译好的 `core-ui.dll`
 
+### 通过 `go get` 使用
+
+在自己的 Go 模块中直接拉取：
+
+```powershell
+go get github.com/YuFu-Onship/core-ui-go-binding/coreui@latest
+```
+
+然后在代码中导入：
+
+```go
+import (
+	"github.com/YuFu-Onship/core-ui-go-binding/coreui"
+	"github.com/YuFu-Onship/core-ui-go-binding/coreui/ui"
+)
+```
+
+`go get` 会下载 cgo 需要的头文件和导入库；运行时仍然需要
+`core-ui.dll`。从模块缓存里取出 DLL：
+
+```powershell
+$mod = go list -m -f '{{.Dir}}' github.com/YuFu-Onship/core-ui-go-binding
+copy "$mod\third_party\coreui\bin\core-ui.dll" .
+```
+
+启动时可以检查实际加载的 DLL 版本：
+
+```go
+v := coreui.DLLVersion()
+fmt.Println("core-ui.dll:", v) // 1.9.0.345
+
+if !v.AtLeast(coreui.VersionInfo{Major: 1, Minor: 9, Patch: 0, Build: 345}) {
+	log.Fatal("core-ui.dll 版本过旧，请更新 DLL")
+}
+```
+
 ### 方式一：`.uix` + Go
 
 `app.uix`：
@@ -280,5 +316,25 @@ ui.Column(
 ).Gap(10)
 ```
 
+### 颜色
+
+颜色参数统一使用 Go 标准库的 `color.RGBA`，主题 token 本身也是
+`color.RGBA`：
+
+```go
+import "image/color"
+
+ui.Text("主文字").Color(ui.Fg1)       // 主题 token
+ui.Text("错误").Color(ui.RGB(0xd1, 0x34, 0x38)) // 自定义颜色
+ui.Text("半透明").Color(ui.RGBA(0x12, 0x31, 0x75, 0x80))
+ui.Column().Bg(ui.CardBg).Border(1, ui.BorderColor)
+ui.Column().Bg(color.RGBA{R: 0x25, G: 0x63, B: 0xeb, A: 0xff})
+```
+
+`Color` / `Bg` / `Border*` 不再接受字符串或任意 `any` 类型；需要自定义颜色时
+使用 `color.RGBA`、`ui.RGB(...)` 或 `ui.RGBA(...)`。
+
 状态变化通常**不需要** `Rebuild`；只有列表增删、页面结构变化时才调用
 `app.Rebuild()`。后台 goroutine 修改界面请使用 `app.Post(func(){ ... })`。
+切换主题请使用 `app.SetTheme(...)`：它会同步刷新纯 Go 颜色 token 并自动
+触发一次 Rebuild。

@@ -35,11 +35,8 @@ func kv(label string, value any) *ui.Node {
 	).Gap(8).Items(ui.AlignCenter)
 }
 
-func swatch(label string, c any) *ui.Node {
-	value := fmt.Sprint(c)
-	if cc, ok := c.(color.Color); ok {
-		value = ui.FromColor(cc)
-	}
+func swatch(label string, c color.RGBA) *ui.Node {
+	value := ui.FromColor(c)
 	return ui.Row(
 		ui.Stack().Size(18, 18).Bg(c).Radius(4).Border(1, ui.BorderColor),
 		ui.Text(label).FontSize(12).Color(ui.Fg2),
@@ -54,7 +51,7 @@ func (g *gallery) overviewPage() *ui.Node {
 	return g.pageView(
 		"用法画廊 · 总览",
 		"左侧每个页面只演示一类能力。把问题缩小到某一页，再对照 README 的检查项。",
-		ui.Row(
+		ui.Column(
 			card("状态与事件",
 				ui.Row(
 					ui.Text("count = ", g.count).FontSize(18),
@@ -85,7 +82,7 @@ func (g *gallery) overviewPage() *ui.Node {
 // ---- 布局 ---------------------------------------------------------------
 
 func (g *gallery) layoutPage() *ui.Node {
-	box := func(text string, bg any) *ui.Node {
+	box := func(text string, bg color.RGBA) *ui.Node {
 		return ui.Stack(ui.Text(text).Color(ui.Fg1)).Height(64).Radius(8).Bg(bg).CenterContent()
 	}
 	return g.pageView(
@@ -590,16 +587,16 @@ func (g *gallery) colorsPage() *ui.Node {
 			ui.Row(
 				ui.Column(
 					swatch("color.RGBA", color.RGBA{R: 0x25, G: 0x63, B: 0xeb, A: 0xff}),
-					swatch("color.NRGBA", color.NRGBA{R: 0x22, G: 0xc5, B: 0x5e, A: 0xff}),
-					swatch("NRGBA alpha", color.NRGBA{R: 0x25, G: 0x63, B: 0xeb, A: 0x80}),
-				).Grow(),
-				ui.Column(
-					swatch("ui.RGB", ui.RGB(0x25, 0x63, 0xeb)),
-					swatch("ui.RGBA", ui.RGBA(0x25, 0x63, 0xeb, 0x80)),
+					swatch("RGBA alpha", ui.RGBA(0x12, 0x31, 0x75, 0x80)),
 					swatch("Transparent", ui.Transparent),
 				).Grow(),
+				ui.Column(
+					swatch("ui.RGB", ui.RGB(0x22, 0xc5, 0x5e)),
+					swatch("ui.Accent", ui.Accent),
+					swatch("ui.Fg1", ui.Fg1),
+				).Grow(),
 			).Gap(20),
-			ui.Text("Color / Bg / Border 接受主题 token、CSS 字符串和 color.Color。").FontSize(12).Color(ui.Fg3),
+			ui.Text("Color / Bg / Border 的颜色参数统一为 color.RGBA；主题 token 也是 color.RGBA。").FontSize(12).Color(ui.Fg3),
 		),
 	)
 }
