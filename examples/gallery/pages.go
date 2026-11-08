@@ -155,10 +155,7 @@ func (g *gallery) selectionConditionsPage() *ui.Node {
 				segment(0, "A"), segment(1, "B"), segment(2, "C"), segment(3, "D"),
 			).Gap(8).Items(ui.AlignCenter),
 		),
-		ui.WhenInt(g.choice, 0, card("当前选择 A", ui.Text("v-if == 0"))),
-		ui.WhenInt(g.choice, 1, card("当前选择 B", ui.Text("v-if == 1"))),
-		ui.WhenInt(g.choice, 2, card("当前选择 C", ui.Text("v-if == 2"))),
-		ui.WhenInt(g.choice, 3, card("当前选择 D", ui.Text("v-if == 3"))),
+		// 条件与 Rebuild 放在所有条件演示卡片之前。
 		card("条件与 Rebuild",
 			ui.Row(
 				ui.Toggle("showA", g.showA),
@@ -168,6 +165,10 @@ func (g *gallery) selectionConditionsPage() *ui.Node {
 				ui.Text(g.count),
 			).Gap(12).Items(ui.AlignCenter),
 		),
+		ui.WhenInt(g.choice, 0, card("当前选择 A", ui.Text("v-if == 0"))),
+		ui.WhenInt(g.choice, 1, card("当前选择 B", ui.Text("v-if == 1"))),
+		ui.WhenInt(g.choice, 2, card("当前选择 C", ui.Text("v-if == 2"))),
+		ui.WhenInt(g.choice, 3, card("当前选择 D", ui.Text("v-if == 3"))),
 		ui.When(g.showA, card("v-if A", ui.Text("A 分支"))),
 		ui.Unless(g.showA, card("v-else", ui.Text("else 分支"))),
 		ui.ShowWhen(g.showB, card("v-show", ui.Text("visible 切换"))),
