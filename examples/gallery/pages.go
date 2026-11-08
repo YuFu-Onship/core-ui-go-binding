@@ -143,7 +143,11 @@ func (g *gallery) selectionConditionsPage() *ui.Node {
 	segment := func(i int, label string) *ui.Node {
 		return ui.Button(label).OnClick(func() { g.choice.Set(i) })
 	}
-	return g.pageView("选择与条件",
+
+	// 条件演示使用普通 Go if/else，不在 gallery 里依赖 When /
+	// WhenInt / Unless / ShowWhen / HiddenWhen。状态变化后显式 Rebuild，
+	// 避免这些特殊控件在反复挂载/卸载时引入额外的生命周期问题。
+	children := []any{
 		card("选择",
 			ui.Row(
 				ui.Text("Select").Width(72).Color(ui.Fg3),
@@ -155,10 +159,7 @@ func (g *gallery) selectionConditionsPage() *ui.Node {
 				segment(0, "A"), segment(1, "B"), segment(2, "C"), segment(3, "D"),
 			).Gap(8).Items(ui.AlignCenter),
 		),
-		ui.WhenInt(g.choice, 0, card("当前选择 A", ui.Text("v-if == 0"))),
-		ui.WhenInt(g.choice, 1, card("当前选择 B", ui.Text("v-if == 1"))),
-		ui.WhenInt(g.choice, 2, card("当前选择 C", ui.Text("v-if == 2"))),
-		ui.WhenInt(g.choice, 3, card("当前选择 D", ui.Text("v-if == 3"))),
+		// 条件与 Rebuild 放在所有条件演示卡片之前。
 		card("条件与 Rebuild",
 			ui.Row(
 				ui.Toggle("showA", g.showA),
@@ -168,11 +169,31 @@ func (g *gallery) selectionConditionsPage() *ui.Node {
 				ui.Text(g.count),
 			).Gap(12).Items(ui.AlignCenter),
 		),
-		ui.When(g.showA, card("v-if A", ui.Text("A 分支"))),
-		ui.Unless(g.showA, card("v-else", ui.Text("else 分支"))),
-		ui.ShowWhen(g.showB, card("v-show", ui.Text("visible 切换"))),
-		ui.HiddenWhen(g.showB, card("v-show 反向", ui.Text("visible 切换"))),
-	)
+	}
+
+	choice := g.choice.Get()
+	if choice == 0 {
+		children = append(children, card("当前选择 A", ui.Text("if choice == 0")))
+	} else if choice == 1 {
+		children = append(children, card("当前选择 B", ui.Text("if choice == 1")))
+	} else if choice == 2 {
+		children = append(children, card("当前选择 C", ui.Text("if choice == 2")))
+	} else {
+		children = append(children, card("当前选择 D", ui.Text("if choice == 3")))
+	}
+
+	if g.showA.Get() {
+		children = append(children, card("v-if A", ui.Text("showA = true")))
+	} else {
+		children = append(children, card("v-else", ui.Text("showA = false")))
+	}
+	if g.showB.Get() {
+		children = append(children, card("v-show", ui.Text("showB = true")))
+	} else {
+		children = append(children, card("v-show 反向", ui.Text("showB = false")))
+	}
+
+	return g.pageView("选择与条件", children...)
 }
 
 // ---- 列表与滚动 ---------------------------------------------------------

@@ -17,7 +17,7 @@ dist\gallery.exe
 | 布局 | Row / Column / flex / padding / gap / 对齐 / Card |
 | 文本与按钮 | Text、Primary / 普通 / 禁用按钮、状态绑定 |
 | 输入控件 | Input、Password、TextArea、Check、Toggle、Slider、Progress、搜索 |
-| 选择与条件 | Select、分段按钮、WhenInt、When / Unless、v-show |
+| 选择与条件 | Select、分段按钮、普通 Go if/else + Rebuild、Toggle 状态演示 |
 | 列表与滚动 | ScrollView、Each、添加/批量添加/删除、Rebuild |
 | 事件与诊断 | OnClick、OnDblClick、OnChange、OnEvent("wheel") |
 | 颜色 Token | Fg / Bg / Card / Accent、color.RGBA、透明色 |

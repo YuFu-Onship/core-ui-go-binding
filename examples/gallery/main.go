@@ -164,7 +164,11 @@ func newGallery(app *ui.App) *gallery {
 		if i >= 0 && i < len(g.choiceOpts) {
 			g.choiceText.Set(g.choiceOpts[i])
 		}
+		// 选择与条件页使用普通 Go if/else，需要重新执行 View。
+		g.app.Rebuild()
 	})
+	g.showA.OnChange(func(bool) { g.app.Rebuild() })
+	g.showB.OnChange(func(bool) { g.app.Rebuild() })
 
 	g.todos = []todo{
 		{Title: "检查 Row / Column 嵌套", Done: true},
